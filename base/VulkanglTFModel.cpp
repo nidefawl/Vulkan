@@ -692,8 +692,8 @@ void vkglTF::Model::createEmptyTexture(VkQueue transferQueue)
 	emptyTexture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	// Clean up staging resources
-	vkFreeMemory(device->logicalDevice, stagingMemory, nullptr);
 	vkDestroyBuffer(device->logicalDevice, stagingBuffer, nullptr);
+	vkFreeMemory(device->logicalDevice, stagingMemory, nullptr);
 
 	VkSamplerCreateInfo samplerCreateInfo = vks::initializers::samplerCreateInfo();
 	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
