@@ -64,6 +64,12 @@ namespace vks
 		{
 			vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 		}
+
+		if (logicalDevice && cmdBufferFlushFence)
+		{
+			vkDestroyFence(logicalDevice, cmdBufferFlushFence, nullptr);
+		}
+
 		if (logicalDevice)
 		{
 			vkDestroyDevice(logicalDevice, nullptr);
@@ -294,6 +300,10 @@ namespace vks
 
 		// Create a default command pool for graphics command buffers
 		commandPool = createCommandPool(queueFamilyIndices.graphics);
+
+		// Create fence passed to queue submit when flushing command buffers
+		VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
+		VK_CHECK_RESULT(vkCreateFence(logicalDevice, &fenceInfo, nullptr, &cmdBufferFlushFence));
 
 		return result;
 	}
@@ -527,15 +537,14 @@ namespace vks
 		VkSubmitInfo submitInfo = vks::initializers::submitInfo();
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &commandBuffer;
-		// Create fence to ensure that the command buffer has finished executing
-		VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
-		VkFence fence;
-		VK_CHECK_RESULT(vkCreateFence(logicalDevice, &fenceInfo, nullptr, &fence));
+
 		// Submit to the queue
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
+		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, cmdBufferFlushFence));
+
 		// Wait for the fence to signal that command buffer has finished executing
-		VK_CHECK_RESULT(vkWaitForFences(logicalDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
-		vkDestroyFence(logicalDevice, fence, nullptr);
+		VK_CHECK_RESULT(vkWaitForFences(logicalDevice, 1, &cmdBufferFlushFence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
+		VK_CHECK_RESULT(vkResetFences(logicalDevice, 1, &cmdBufferFlushFence));
+
 		if (free)
 		{
 			vkFreeCommandBuffers(logicalDevice, pool, 1, &commandBuffer);

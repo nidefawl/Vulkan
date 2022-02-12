@@ -48,6 +48,8 @@ struct VulkanDevice
 		uint32_t compute;
 		uint32_t transfer;
 	} queueFamilyIndices;
+	/** @brief Fence for flushing command buffers */
+	VkFence cmdBufferFlushFence = VK_NULL_HANDLE;
 	operator VkDevice() const
 	{
 		return logicalDevice;
