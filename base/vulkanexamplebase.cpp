@@ -51,6 +51,8 @@ VkResult VulkanExampleBase::createInstance(bool enableValidation)
 	instanceExtensions.push_back(VK_MVK_IOS_SURFACE_EXTENSION_NAME);
 #elif defined(VK_USE_PLATFORM_MACOS_MVK)
 	instanceExtensions.push_back(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
+#elif defined(VK_USE_PLATFORM_HEADLESS_EXT)
+	instanceExtensions.push_back(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME);
 #endif
 
 	// Get extensions supported by the instance and store for later use
@@ -595,6 +597,40 @@ void VulkanExampleBase::renderLoop()
 		}
 		updateOverlay();
 	}
+#elif defined(VK_USE_PLATFORM_HEADLESS_EXT)
+	while (!quit)
+	{
+		auto tStart = std::chrono::high_resolution_clock::now();
+		if (viewUpdated)
+		{
+			viewUpdated = false;
+			viewChanged();
+		}
+		render();
+		frameCounter++;
+		auto tEnd = std::chrono::high_resolution_clock::now();
+		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+		frameTimer = tDiff / 1000.0f;
+		camera.update(frameTimer);
+		if (camera.moving())
+		{
+			viewUpdated = true;
+		}
+		// Convert to clamped timer value
+		timer += timerSpeed * frameTimer;
+		if (timer > 1.0)
+		{
+			timer -= 1.0f;
+		}
+		float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - lastTimestamp).count();
+		if (fpsTimer > 1000.0f)
+		{
+			lastFPS = (float)frameCounter * (1000.0f / fpsTimer);
+			frameCounter = 0;
+			lastTimestamp = tEnd;
+		}
+		updateOverlay();
+	}
 #elif (defined(VK_USE_PLATFORM_MACOS_MVK) && defined(VK_EXAMPLE_XCODE_GENERATED))
 	[NSApp run];
 #endif
@@ -874,9 +910,12 @@ VulkanExampleBase::VulkanExampleBase(bool enableValidation)
 	}
 	if (commandLineParser.isSet("benchmarkresultfile")) {
 		benchmark.filename = commandLineParser.getValueAsString("benchmarkresultfile", benchmark.filename);
-	}
-	if (commandLineParser.isSet("benchmarkframetimes")) {
+	}	
+	if (commandLineParser.isSet("benchmarkresultframes")) {
 		benchmark.outputFrameTimes = true;
+	}
+	if (commandLineParser.isSet("benchmarkframes")) {
+		benchmark.outputFrames = commandLineParser.getValueAsInt("benchmarkframes", benchmark.outputFrames);
 	}
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -910,7 +949,10 @@ VulkanExampleBase::~VulkanExampleBase()
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 	}
 	destroyCommandBuffers();
-	vkDestroyRenderPass(device, renderPass, nullptr);
+	if (renderPass != VK_NULL_HANDLE)
+	{
+		vkDestroyRenderPass(device, renderPass, nullptr);
+	}
 	for (uint32_t i = 0; i < frameBuffers.size(); i++)
 	{
 		vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
@@ -968,7 +1010,8 @@ VulkanExampleBase::~VulkanExampleBase()
 		wl_keyboard_destroy(keyboard);
 	if (pointer)
 		wl_pointer_destroy(pointer);
-	wl_seat_destroy(seat);
+	if (seat)
+		wl_seat_destroy(seat);
 	xdg_wm_base_destroy(shell);
 	wl_compositor_destroy(compositor);
 	wl_registry_destroy(registry);
@@ -2254,11 +2297,16 @@ void VulkanExampleBase::initWaylandConnection()
 	wl_registry_add_listener(registry, &registry_listener, this);
 	wl_display_dispatch(display);
 	wl_display_roundtrip(display);
-	if (!compositor || !shell || !seat)
+	if (!compositor || !shell)
 	{
 		std::cout << "Could not bind Wayland protocols!\n";
 		fflush(stdout);
 		exit(1);
+	}
+	if (!seat)
+	{
+		std::cout << "WARNING: Input handling not available!\n";
+		fflush(stdout);
 	}
 }
 
@@ -2551,6 +2599,10 @@ void VulkanExampleBase::handleEvent(const xcb_generic_event_t *event)
 		break;
 	}
 }
+#else
+void VulkanExampleBase::setupWindow()
+{
+}
 #endif
 
 void VulkanExampleBase::viewChanged() {}
@@ -2816,14 +2868,14 @@ void VulkanExampleBase::initSwapchain()
 	swapChain.initSurface(androidApp->window);
 #elif (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
 	swapChain.initSurface(view);
-#elif defined(_DIRECT2DISPLAY)
-	swapChain.initSurface(width, height);
 #elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
 	swapChain.initSurface(dfb, surface);
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 	swapChain.initSurface(display, surface);
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	swapChain.initSurface(connection, window);
+#elif (defined(_DIRECT2DISPLAY) || defined(VK_USE_PLATFORM_HEADLESS_EXT))
+	swapChain.initSurface(width, height);
 #endif
 }
 
@@ -2851,7 +2903,8 @@ CommandLineParser::CommandLineParser()
 	add("benchmarkwarmup", { "-bw", "--benchwarmup" }, 1, "Set warmup time for benchmark mode in seconds");
 	add("benchmarkruntime", { "-br", "--benchruntime" }, 1, "Set duration time for benchmark mode in seconds");
 	add("benchmarkresultfile", { "-bf", "--benchfilename" }, 1, "Set file name for benchmark results");
-	add("benchmarkresultframes", { "-bt", "--benchframetimes" }, 1, "Save frame times to benchmark results file");
+	add("benchmarkresultframes", { "-bt", "--benchframetimes" }, 0, "Save frame times to benchmark results file");
+	add("benchmarkframes", { "-bfs", "--benchmarkframes" }, 1, "Only render the given number of frames");
 }
 
 void CommandLineParser::add(std::string name, std::vector<std::string> commands, bool hasValue, std::string help)

@@ -180,18 +180,26 @@ void VulkanglTFScene::loadNode(const tinygltf::Node& inputNode, const tinygltf::
 			// glTF supports different component types of indices, so we need to check what index type the mesh is using
 			switch (accessor.componentType) {
 			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT: {
-				uint32_t* buf = new uint32_t[accessor.count];
-				memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint32_t));
+				const uint32_t* buf = reinterpret_cast<const uint32_t*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 				for (size_t index = 0; index < accessor.count; index++) {
 					indexBuffer.push_back(buf[index] + vertexStart);
+						indexBuffer.push_back(buf[index] + vertexStart);
+					}
+					break;
 				}
-				break;
-			}
-			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT: {
-				uint16_t* buf = new uint16_t[accessor.count];
-				memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint16_t));
-				for (size_t index = 0; index < accessor.count; index++) {
-					indexBuffer.push_back(buf[index] + vertexStart);
+				case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT: {
+					const uint16_t* buf = reinterpret_cast<const uint16_t*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
+					for (size_t index = 0; index < accessor.count; index++) {
+						indexBuffer.push_back(buf[index] + vertexStart);
+					}
+					break;
+				}
+				case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: {
+					const uint8_t* buf = reinterpret_cast<const uint8_t*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
+					for (size_t index = 0; index < accessor.count; index++) {
+						indexBuffer.push_back(buf[index] + vertexStart);
+					}
+					break;
 				}
 				break;
 			}
@@ -372,7 +380,6 @@ VulkanExample::VulkanExample() : VulkanExampleBase(ENABLE_VALIDATION)
 	camera.setPosition(glm::vec3(0.0f, 1.0f, 0.0f));
 	camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
 	camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-	settings.overlay = true;
 }
 
 VulkanExample::~VulkanExample()
@@ -512,7 +519,7 @@ void VulkanExample::createPipelines()
 	for (auto &material : glTFScene->materials) {
 		// Properties for alpha-masked materials (like plants) are passed using specialization constants
 		struct MaterialSpecializationData {
-			bool alphaMask;
+			VkBool32 alphaMask;
 			float alphaMaskCutoff;
 		} materialSpecializationData;
 		materialSpecializationData.alphaMask = material.alphaMode == "MASK";

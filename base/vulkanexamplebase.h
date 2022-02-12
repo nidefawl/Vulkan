@@ -161,7 +161,7 @@ protected:
 	// Command buffers used for rendering
 	std::vector<VkCommandBuffer> drawCmdBuffers;
 	// Global render pass for frame buffer writes
-	VkRenderPass renderPass;
+	VkRenderPass renderPass = VK_NULL_HANDLE;
 	// List of available frame buffers (same as number of swap chain images)
 	std::vector<VkFramebuffer>frameBuffers;
 	// Active frame buffer index
@@ -212,7 +212,7 @@ public:
 		/** @brief Set to true if v-sync will be forced for the swapchain */
 		bool vsync = false;
 		/** @brief Enable UI overlay */
-		bool overlay = false;
+		bool overlay = true;
 	} settings;
 	
 	VkClearValue defaultClearValues[2] = { { 0.0f, 0.0f, 0.2f, 1.0f }, { 1.0f, 0 } };
@@ -296,6 +296,8 @@ public:
 	xcb_screen_t *screen;
 	xcb_window_t window;
 	xcb_intern_atom_reply_t *atom_wm_delete_window;
+#elif defined(VK_USE_PLATFORM_HEADLESS_EXT)
+	bool quit = false;
 #endif
 
 	VulkanExampleBase(bool enableValidation = false);
@@ -369,6 +371,8 @@ public:
 	xcb_window_t setupWindow();
 	void initxcbConnection();
 	void handleEvent(const xcb_generic_event_t *event);
+#else
+	void setupWindow();
 #endif
 	/** @brief (Virtual) Creates the application wide Vulkan instance */
 	virtual VkResult createInstance(bool enableValidation);
@@ -508,7 +512,7 @@ int main(const int argc, const char *argv[])													    \
 	delete(vulkanExample);																			\
 	return 0;																						\
 }
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#elif (defined(VK_USE_PLATFORM_WAYLAND_KHR) || defined(VK_USE_PLATFORM_HEADLESS_EXT))
 #define VULKAN_EXAMPLE_MAIN()																		\
 VulkanExample *vulkanExample;																		\
 int main(const int argc, const char *argv[])													    \

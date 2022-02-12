@@ -51,7 +51,7 @@ public:
 	{
 		title = "Conditional rendering";
 		settings.overlay = true;
-		camera.setType(Camera::CameraType::lookat);
+		camera.type = Camera::CameraType::lookat;
 		camera.setPerspective(45.0f, (float)width / (float)height, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(-2.25f, -52.0f, 0.0f));
 		camera.setTranslation(glm::vec3(1.9f, 2.05f, -18.0f));

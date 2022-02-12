@@ -1,16 +1,10 @@
 /*
- * Vulkan Example - Taking screenshots
- *
- * Copyright (C) 2016-2021 by Sascha Willems - www.saschawillems.de
- *
- * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
- */
-
- /*
-  * This sample implements a function to save a screenshot of the current swapchain image
-  * Depending on hardware support, this is done by copying the swapchain contents to a linear tiled image in host memory
-  * That linear image is then saved as a ppm image file to disk
-  */
+* Vulkan Example - Taking screenshots
+*
+* Copyright (C) 2016 by Sascha Willems - www.saschawillems.de
+*
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
@@ -21,30 +15,26 @@ class VulkanExample : public VulkanExampleBase
 {
 public:
 	vkglTF::Model model;
+	vks::Buffer uniformBuffer;
 
-	struct UniformData {
+	struct {
 		glm::mat4 projection;
 		glm::mat4 model;
 		glm::mat4 view;
-	} uniformData;
-
-	struct FrameObjects : public VulkanFrameObjects {
-		vks::Buffer uniformBuffer;
-		VkDescriptorSet descriptorSet;
-	};
-	std::vector<FrameObjects> frameObjects;
+		int32_t texIndex = 0;
+	} uboVS;
 
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSet descriptorSet;
 
 	bool screenshotSaved = false;
 
 	VulkanExample() : VulkanExampleBase(ENABLE_VALIDATION)
 	{
 		title = "Saving framebuffer to screenshot";
-		settings.overlay = true;
-		camera.setType(Camera::CameraType::lookat);
+		camera.type = Camera::CameraType::lookat;
 		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(-25.0f, 23.75f, 0.0f));
 		camera.setTranslation(glm::vec3(0.0f, 0.0f, -3.0f));
@@ -55,10 +45,7 @@ public:
 		vkDestroyPipeline(device, pipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-		for (FrameObjects& frame : frameObjects) {
-			frame.uniformBuffer.destroy();
-			destroyBaseFrameObjects(frame);
-		}
+		uniformBuffer.destroy();
 	}
 
 	void loadAssets()
@@ -66,34 +53,83 @@ public:
 		model.loadFromFile(getAssetPath() + "models/chinesedragon.gltf", vulkanDevice, queue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
 	}
 
-	void createDescriptors()
+	void buildCommandBuffers()
 	{
-		// Pool
-		VkDescriptorPoolSize poolSize = vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, getFrameCount());
-		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSize, getFrameCount());
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
-		// Layout
-		VkDescriptorSetLayoutBinding setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
-		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBinding);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VkClearValue clearValues[2];
+		clearValues[0].color = defaultClearColor;
+		clearValues[1].depthStencil = { 1.0f, 0 };
 
-		// Sets
-		for (FrameObjects& frame : frameObjects) {
-			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &frame.descriptorSet));
-			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(frame.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &frame.uniformBuffer.descriptor);
-			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderArea.offset.x = 0;
+		renderPassBeginInfo.renderArea.offset.y = 0;
+		renderPassBeginInfo.renderArea.extent.width = width;
+		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.clearValueCount = 2;
+		renderPassBeginInfo.pClearValues = clearValues;
+
+		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
+		{
+			// Set target frame buffer
+			renderPassBeginInfo.framebuffer = frameBuffers[i];
+
+			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+
+			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+
+			VkRect2D scissor = vks::initializers::rect2D(width, height,	0, 0);
+			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			model.draw(drawCmdBuffers[i]);
+
+			drawUI(drawCmdBuffers[i]);
+
+			vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+			VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
 		}
 	}
 
-	void createPipelines()
+	void setupDescriptorPool()
 	{
-		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		std::vector<VkDescriptorPoolSize> poolSizes = {
+			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
+		};
+		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
+		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+	}
 
-		// Pipelines
+	void setupDescriptorSetLayout()
+	{
+		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),		// Binding 0: Vertex shader uniform buffer
+		};
+		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+
+		VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pPipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+	}
+
+	void setupDescriptorSet()
+	{
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),	// Binding 0: Vertex shader uniform buffer
+		};
+		vkUpdateDescriptorSets(device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+	}
+
+	void preparePipelines()
+	{
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
 		VkPipelineRasterizationStateCreateInfo rasterizationState = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 		VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
@@ -117,10 +153,30 @@ public:
 		pipelineCI.pViewportState = &viewportState;
 		pipelineCI.pDepthStencilState = &depthStencilState;
 		pipelineCI.pDynamicState = &dynamicState;
-		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
+		pipelineCI.stageCount = shaderStages.size();
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color});
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+	}
+
+	void prepareUniformBuffers()
+	{
+		// Vertex shader uniform buffer block
+		vulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&uniformBuffer,
+			sizeof(uboVS));
+		VK_CHECK_RESULT(uniformBuffer.map());
+		updateUniformBuffers();
+	}
+
+	void updateUniformBuffers()
+	{
+		uboVS.projection = camera.matrices.perspective;
+		uboVS.view = camera.matrices.view;
+		uboVS.model = glm::mat4(1.0f);
+		uniformBuffer.copyTo(&uboVS, sizeof(uboVS));
 	}
 
 	// Take a screenshot from the current swapchain image
@@ -336,52 +392,40 @@ public:
 		screenshotSaved = true;
 	}
 
+	void draw()
+	{
+		VulkanExampleBase::prepareFrame();
+
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
+		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+
+		VulkanExampleBase::submitFrame();
+	}
+
 	void prepare()
 	{
 		VulkanExampleBase::prepare();
-		// Prepare per-frame resources
-		frameObjects.resize(getFrameCount());
-		for (FrameObjects& frame : frameObjects) {
-			createBaseFrameObjects(frame);
-			// Uniform buffers
-			VK_CHECK_RESULT(vulkanDevice->createAndMapBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &frame.uniformBuffer, sizeof(UniformData)));
-		}
 		loadAssets();
-		createDescriptors();
-		createPipelines();
+		prepareUniformBuffers();
+		setupDescriptorSetLayout();
+		preparePipelines();
+		setupDescriptorPool();
+		setupDescriptorSet();
+		buildCommandBuffers();
 		prepared = true;
 	}
 
 	virtual void render()
 	{
-		FrameObjects currentFrame = frameObjects[getCurrentFrameIndex()];
+		if (!prepared)
+			return;
+		draw();
+	}
 
-		VulkanExampleBase::prepareFrame(currentFrame);
-
-		// Update uniform data for the next frame
-		uniformData.projection = camera.matrices.perspective;
-		uniformData.view = camera.matrices.view;
-		uniformData.model = glm::mat4(1.0f);
-		memcpy(currentFrame.uniformBuffer.mapped, &uniformData, sizeof(uniformData));
-
-		// Build the command buffer
-		const VkCommandBuffer commandBuffer = currentFrame.commandBuffer;
-		const VkCommandBufferBeginInfo commandBufferBeginInfo = getCommandBufferBeginInfo();
-		const VkRect2D renderArea = getRenderArea();
-		const VkViewport viewport = getViewport();
-		const VkRenderPassBeginInfo renderPassBeginInfo = getRenderPassBeginInfo(renderPass, defaultClearValues);
-		VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
-		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(commandBuffer, 0, 1, &renderArea);
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &currentFrame.descriptorSet, 0, nullptr);
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		model.draw(commandBuffer);
-		drawUI(commandBuffer);
-		vkCmdEndRenderPass(commandBuffer);
-		VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
-
-		VulkanExampleBase::submitFrame(currentFrame);
+	virtual void viewChanged()
+	{
+		updateUniformBuffers();
 	}
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)

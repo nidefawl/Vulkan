@@ -74,7 +74,6 @@ public:
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -2.0f));
 		camera.setRotation(glm::vec3(0.0f));
 		camera.setPerspective(60.0f, (float)width * 0.5f / (float)height, 1.0f, 256.0f);
-		settings.overlay = true;
 	}
 
 	~VulkanExample()
@@ -490,6 +489,13 @@ public:
 		// Semaphore for compute & graphics sync
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &graphics.semaphore));
+	
+		// Signal the semaphore
+		VkSubmitInfo submitInfo = vks::initializers::submitInfo();
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = &graphics.semaphore;
+		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		VK_CHECK_RESULT(vkQueueWaitIdle(queue));	
 	}
 
 	void prepareCompute()
@@ -559,13 +565,6 @@ public:
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
 		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &compute.semaphore));
 
-		// Signal the semaphore
-		VkSubmitInfo submitInfo = vks::initializers::submitInfo();
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &compute.semaphore;
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-		VK_CHECK_RESULT(vkQueueWaitIdle(queue));
-
 		// Build a single command buffer containing the compute dispatch commands
 		buildComputeCommandBuffer();
 	}
@@ -595,6 +594,19 @@ public:
 
 	void draw()
 	{
+		// Wait for rendering finished
+		VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+		// Submit compute commands
+		VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
+		computeSubmitInfo.commandBufferCount = 1;
+		computeSubmitInfo.pCommandBuffers = &compute.commandBuffer;
+		computeSubmitInfo.waitSemaphoreCount = 1;
+		computeSubmitInfo.pWaitSemaphores = &graphics.semaphore;
+		computeSubmitInfo.pWaitDstStageMask = &waitStageMask;
+		computeSubmitInfo.signalSemaphoreCount = 1;
+		computeSubmitInfo.pSignalSemaphores = &compute.semaphore;
+		VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, VK_NULL_HANDLE));	
 		VulkanExampleBase::prepareFrame();
 
 		VkPipelineStageFlags graphicsWaitStageMasks[] = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -612,20 +624,6 @@ public:
 		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
 
 		VulkanExampleBase::submitFrame();
-
-		// Wait for rendering finished
-		VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-		// Submit compute commands
-		VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
-		computeSubmitInfo.commandBufferCount = 1;
-		computeSubmitInfo.pCommandBuffers = &compute.commandBuffer;
-		computeSubmitInfo.waitSemaphoreCount = 1;
-		computeSubmitInfo.pWaitSemaphores = &graphics.semaphore;
-		computeSubmitInfo.pWaitDstStageMask = &waitStageMask;
-		computeSubmitInfo.signalSemaphoreCount = 1;
-		computeSubmitInfo.pSignalSemaphores = &compute.semaphore;
-		VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, VK_NULL_HANDLE));
 	}
 
 	void prepare()

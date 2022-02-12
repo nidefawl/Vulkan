@@ -22,6 +22,8 @@
 class VulkanExample : public VulkanExampleBase
 {
 public:
+	VkPhysicalDeviceInlineUniformBlockFeaturesEXT enabledInlineUniformBlockFeatures{};
+
 	vkglTF::Model model;
 
 	// Color and position data for each sphere will be passed to the shader using an inline uniform block for each, so we store them in this array
@@ -66,6 +68,9 @@ public:
 		camera.setMovementSpeed(4.0f);
 		camera.setRotationSpeed(0.25f);
 		settings.overlay = true;
+		camera.movementSpeed = 4.0f;
+		camera.rotationSpeed = 0.25f;
+
 		srand((unsigned int)time(0));
 		
 		// Enable the extension required to use inline uniform blocks
@@ -218,6 +223,14 @@ public:
 			const float rad = glm::radians((float)i * 360.0f / static_cast<uint32_t>(spheres.size()));
 			spheres[i].uniformData.position = glm::vec4(glm::vec3(sin(rad), cos(rad), 0.0f) * 3.5f, 1.0f);
 		}
+	}
+
+	void getEnabledFeatures()
+	{
+		// Enable the inline uniform block feature using the dedicated physical device structure
+		enabledInlineUniformBlockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
+		enabledInlineUniformBlockFeatures.inlineUniformBlock = VK_TRUE;
+		deviceCreatepNextChain = &enabledInlineUniformBlockFeatures;
 	}
 
 	void prepare()

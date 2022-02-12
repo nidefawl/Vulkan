@@ -287,24 +287,21 @@ public:
 					// glTF supports different component types of indices, so we need to check what index type the mesh is using
 					switch (accessor.componentType) {
 					case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT: {
-						uint32_t* buf = new uint32_t[accessor.count];
-						memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint32_t));
+						const uint32_t* buf = reinterpret_cast<const uint32_t*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 						for (size_t index = 0; index < accessor.count; index++) {
 							indexBuffer.push_back(buf[index] + vertexStart);
 						}
 						break;
 					}
 					case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT: {
-						uint16_t* buf = new uint16_t[accessor.count];
-						memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint16_t));
+						const uint16_t* buf = reinterpret_cast<const uint16_t*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 						for (size_t index = 0; index < accessor.count; index++) {
 							indexBuffer.push_back(buf[index] + vertexStart);
 						}
 						break;
 					}
 					case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: {
-						uint8_t* buf = new uint8_t[accessor.count];
-						memcpy(buf, &buffer.data[accessor.byteOffset + bufferView.byteOffset], accessor.count * sizeof(uint8_t));
+						const uint8_t* buf = reinterpret_cast<const uint8_t*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 						for (size_t index = 0; index < accessor.count; index++) {
 							indexBuffer.push_back(buf[index] + vertexStart);
 						}
@@ -503,7 +500,6 @@ public:
 		camera.setPosition(glm::vec3(0.0f, -0.1f, -1.0f));
 		camera.setRotation(glm::vec3(0.0f, -135.0f, 0.0f));
 		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-		settings.overlay = true;
 	}
 
 	~VulkanExample()

@@ -69,7 +69,6 @@ public:
 		camera.setRotation(glm::vec3(0.0f));
 		camera.setRotationSpeed(0.25f);
 		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-		settings.overlay = true;
 	}
 
 	~VulkanExample()
@@ -87,10 +86,12 @@ public:
 		}
 	}
 
+	// Enable physical device features required for this example
 	virtual void getEnabledFeatures()
 	{
-		// Enable anisotropic filtering if supported
-		enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+		if (deviceFeatures.samplerAnisotropy) {
+			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		}
 	}
 
 	// Loads the cubemap texture from disk and uploads it to the GPU

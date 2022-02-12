@@ -80,7 +80,6 @@ public:
 		camera.setPosition(glm::vec3(5.5f, -1.85f, -18.5f));
 		camera.setRotation(glm::vec3(-17.2f, -4.7f, 0.0f));
 		camera.setPerspective(60.0f, (float)width / (float)height, 1.0f, 256.0f);
-		settings.overlay = true;
 	}
 
 	~VulkanExample()
@@ -384,7 +383,7 @@ public:
 		// Star field
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &currentFrame.descriptorSets.planet, 0, nullptr);
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.starfield);
-		vkCmdDraw(commandBuffer, 4, 1, 0, 0);
+		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
 		// Planet
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &currentFrame.descriptorSets.planet, 0, nullptr);

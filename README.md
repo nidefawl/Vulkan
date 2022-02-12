@@ -9,6 +9,7 @@ A comprehensive collection of open source C++ examples for [Vulkan®](https://ww
 + [Cloning](#Cloning)
 + [Assets](#Assets)
 + [Building](#Building)
++ [Running](#Running)
 + [Shaders](#Shaders)
 + [Examples](#Examples)
     + [Basics](#Basics)
@@ -62,6 +63,28 @@ from the root of the repository after cloning or see [this](data/README.md) for 
 The repository contains everything required to compile and build the examples on <img src="./images/windowslogo.png" alt="" height="22px" valign="bottom"> Windows, <img src="./images/linuxlogo.png" alt="" height="24px" valign="bottom"> Linux, <img src="./images/androidlogo.png" alt="" height="24px" valign="bottom"> Android, <img src="./images/applelogo.png" alt="" valign="bottom" height="24px"> iOS and macOS (using MoltenVK) using a C++ compiler that supports C++11.
 
 See [BUILD.md](BUILD.md) for details on how to build for the different platforms.
+
+## Running
+
+Once built, examples can be run from the bin directory. The list of available command line options can be brought up with `--help`:
+```
+ -v, --validation: Enable validation layers
+ -br, --benchruntime: Set duration time for benchmark mode in seconds
+ -vs, --vsync: Enable V-Sync
+ -w, --width: Set window width
+ -f, --fullscreen: Start in fullscreen mode
+ --help: Show help
+ -h, --height: Set window height
+ -bt, --benchframetimes: Save frame times to benchmark results file
+ -s, --shaders: Select shader type to use (glsl or hlsl)
+ -b, --benchmark: Run example in benchmark mode
+ -g, --gpu: Select GPU to run on
+ -bf, --benchfilename: Set file name for benchmark results
+ -gl, --listgpus: Display a list of available Vulkan devices
+ -bw, --benchwarmup: Set warmup time for benchmark mode in seconds
+```
+
+Note that some examples require specific device features, and if you are on a multi-gpu system you might need to use the `-gl` and `-g` to select a gpu that supports them.
 
 ## Shaders
 
@@ -133,6 +156,11 @@ Implements a simple CPU based particle system. Particle data is stored in host m
 #### [Stencil buffer](examples/stencilbuffer/)
 
 Uses the stencil buffer and its compare functionality for rendering a 3D model with dynamic outlines.
+
+
+#### [Vertex attributes](examples/vertexattributes/)
+
+Demonstrates two different ways of passing vertices to the vertex shader using either interleaved or separate vertex attributes.
 
 ### glTF
 
@@ -280,7 +308,7 @@ Renders a scene to multiple viewports in one pass using a geometry shader to app
 
 ### Tessellation Shader
 
-#### [Displacement mapping](examples/tessellation/)
+#### [Displacement mapping](examples/displacement/)
 
 Uses a height map to dynamically generate and displace additional geometric detail for a low-poly mesh.
 
@@ -394,6 +422,9 @@ Uses a special image that contains variable shading rates to vary the number of 
 
 Demonstrates the use of VK_EXT_descriptor_indexing for creating descriptor sets with a variable size that can be dynamically indexed in a shader using `GL_EXT_nonuniform_qualifier` and `SPV_EXT_descriptor_indexing`.
 
+#### [Dynamic rendering (VK_KHR_dynamic_rendering)](examples/dynamicrendering/)
+
+Shows usage of the VK_KHR_dynamic_rendering extension, which simplifies the rendering setup by no longer requiring render pass objects or framebuffers.
 
 ### Misc
 

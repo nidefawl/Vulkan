@@ -50,7 +50,11 @@ namespace vks
 		io.FontGlobalScale = scale;
 	}
 
-	UIOverlay::~UIOverlay()	{ }
+	UIOverlay::~UIOverlay()	{
+		if (ImGui::GetCurrentContext()) {
+			ImGui::DestroyContext();
+		}
+	}
 
 	/** Prepare all vulkan resources required to render the UI overlay */
 	void UIOverlay::prepareResources()
@@ -397,7 +401,6 @@ namespace vks
 
 	void UIOverlay::freeResources()
 	{
-		ImGui::DestroyContext();
 		vertexBuffer.destroy();
 		indexBuffer.destroy();
 		vkDestroyImageView(device->logicalDevice, fontView, nullptr);
@@ -427,6 +430,13 @@ namespace vks
 		bool val = (*value == 1);
 		bool res = ImGui::Checkbox(caption, &val);
 		*value = val;
+		if (res) { updated = true; };
+		return res;
+	}
+
+	bool UIOverlay::radioButton(const char* caption, bool value)
+	{
+		bool res = ImGui::RadioButton(caption, value);
 		if (res) { updated = true; };
 		return res;
 	}

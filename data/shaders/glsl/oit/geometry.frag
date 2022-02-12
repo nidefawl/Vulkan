@@ -16,6 +16,13 @@ layout (set = 1, binding = 1) buffer LinkedListSBO
     Node nodes[];
 };
 
+layout (set = 1, binding = 0, r32ui) uniform coherent uimage2D headIndexImage;
+
+layout (set = 1, binding = 1) buffer LinkedListSBO
+{
+    Node nodes[];
+};
+
 layout (set = 1, binding = 2) buffer GeometrySBO
 {
     uint count;
