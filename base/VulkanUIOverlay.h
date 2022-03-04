@@ -88,5 +88,8 @@ namespace vks
 		bool comboBox(const char* caption, int32_t* itemindex, std::vector<std::string> items);
 		bool button(const char* caption);
 		void text(const char* formatstr, ...);
+		// @todo
+		void setSampleCount(VkSampleCountFlagBits sampleCount);
+		void setSubpass(uint32_t subpass);
 	};
 }

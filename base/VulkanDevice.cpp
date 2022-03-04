@@ -64,6 +64,12 @@ namespace vks
 		{
 			vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 		}
+
+		if (logicalDevice && cmdBufferFlushFence)
+		{
+			vkDestroyFence(logicalDevice, cmdBufferFlushFence, nullptr);
+		}
+
 		if (logicalDevice)
 		{
 			vkDestroyDevice(logicalDevice, nullptr);
@@ -265,7 +271,7 @@ namespace vks
 		}
 
 		// Enable the debug marker extension if it is present (likely meaning a debugging tool is present)
-		if (extensionSupported(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+		if (extensionSupported(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))
 		{
 			deviceExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
 			enableDebugMarkers = true;
@@ -294,6 +300,10 @@ namespace vks
 
 		// Create a default command pool for graphics command buffers
 		commandPool = createCommandPool(queueFamilyIndices.graphics);
+
+		// Create fence passed to queue submit when flushing command buffers
+		VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
+		VK_CHECK_RESULT(vkCreateFence(logicalDevice, &fenceInfo, nullptr, &cmdBufferFlushFence));
 
 		return result;
 	}
@@ -415,6 +425,16 @@ namespace vks
 		return buffer->bind();
 	}
 
+	VkResult VulkanDevice::createAndMapBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, vks::Buffer* buffer, VkDeviceSize size, void* data)
+	{
+		VkResult result = createBuffer(usageFlags, memoryPropertyFlags, buffer, size, data);
+		if (result != VK_SUCCESS) {
+			return result;
+		}
+		buffer->map();
+		return VK_SUCCESS;
+	}
+
 	/**
 	* Copy buffer data from src to dst using VkCmdCopyBuffer
 	* 
@@ -517,15 +537,14 @@ namespace vks
 		VkSubmitInfo submitInfo = vks::initializers::submitInfo();
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &commandBuffer;
-		// Create fence to ensure that the command buffer has finished executing
-		VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
-		VkFence fence;
-		VK_CHECK_RESULT(vkCreateFence(logicalDevice, &fenceInfo, nullptr, &fence));
+
 		// Submit to the queue
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
+		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, cmdBufferFlushFence));
+
 		// Wait for the fence to signal that command buffer has finished executing
-		VK_CHECK_RESULT(vkWaitForFences(logicalDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
-		vkDestroyFence(logicalDevice, fence, nullptr);
+		VK_CHECK_RESULT(vkWaitForFences(logicalDevice, 1, &cmdBufferFlushFence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
+		VK_CHECK_RESULT(vkResetFences(logicalDevice, 1, &cmdBufferFlushFence));
+
 		if (free)
 		{
 			vkFreeCommandBuffers(logicalDevice, pool, 1, &commandBuffer);

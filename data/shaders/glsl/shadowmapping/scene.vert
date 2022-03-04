@@ -5,13 +5,13 @@ layout (location = 1) in vec2 inUV;
 layout (location = 2) in vec3 inColor;
 layout (location = 3) in vec3 inNormal;
 
-layout (binding = 0) uniform UBO 
+layout (set = 0, binding = 0) uniform UBO 
 {
 	mat4 projection;
 	mat4 view;
 	mat4 model;
-	mat4 lightSpace;
-	vec3 lightPos;
+	mat4 depthMVP;
+	vec4 lightPos;
 } ubo;
 
 layout (location = 0) out vec3 outNormal;
@@ -40,9 +40,9 @@ void main()
 	
     vec4 pos = ubo.model * vec4(inPos, 1.0);
     outNormal = mat3(ubo.model) * inNormal;
-    outLightVec = normalize(ubo.lightPos - inPos);
+    outLightVec = normalize(ubo.lightPos.xyz - inPos);
     outViewVec = -pos.xyz;			
 
-	outShadowCoord = ( biasMat * ubo.lightSpace * ubo.model ) * vec4(inPos, 1.0);	
+	outShadowCoord = ( biasMat * ubo.depthMVP * ubo.model ) * vec4(inPos, 1.0);	
 }
 

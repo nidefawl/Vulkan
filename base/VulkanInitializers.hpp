@@ -73,6 +73,23 @@ namespace vks
 			return renderPassBeginInfo;
 		}
 
+		inline VkRenderPassBeginInfo renderPassBeginInfo(
+			VkRenderPass renderPass,
+			VkExtent2D renderExtent,
+			VkFramebuffer framebuffer,
+			VkClearValue* clearValues,
+			uint32_t clearValueCount)
+		{
+			VkRenderPassBeginInfo renderPassBeginInfo{};
+			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassBeginInfo.renderPass = renderPass;
+			renderPassBeginInfo.renderArea.extent = renderExtent;
+			renderPassBeginInfo.framebuffer = framebuffer;
+			renderPassBeginInfo.pClearValues = clearValues;
+			renderPassBeginInfo.clearValueCount = clearValueCount;
+			return renderPassBeginInfo;
+		}
+
 		inline VkRenderPassCreateInfo renderPassCreateInfo()
 		{
 			VkRenderPassCreateInfo renderPassCreateInfo {};
@@ -179,6 +196,19 @@ namespace vks
 			return viewport;
 		}
 
+		inline VkViewport viewport(
+			VkExtent2D extent,
+			float minDepth,
+			float maxDepth)
+		{
+			VkViewport viewport{};
+			viewport.width = (float)extent.width;
+			viewport.height = (float)extent.height;
+			viewport.minDepth = minDepth;
+			viewport.maxDepth = maxDepth;
+			return viewport;
+		}
+
 		inline VkRect2D rect2D(
 			int32_t width,
 			int32_t height,
@@ -190,6 +220,16 @@ namespace vks
 			rect2D.extent.height = height;
 			rect2D.offset.x = offsetX;
 			rect2D.offset.y = offsetY;
+			return rect2D;
+		}
+
+		inline VkRect2D rect2D(
+			VkExtent2D extent,
+			VkOffset2D offset = { 0, 0 })
+		{
+			VkRect2D rect2D{};
+			rect2D.extent = extent;
+			rect2D.offset = offset;
 			return rect2D;
 		}
 
@@ -236,6 +276,18 @@ namespace vks
 			return descriptorPoolInfo;
 		}
 
+		inline VkDescriptorPoolCreateInfo descriptorPoolCreateInfo(
+			const VkDescriptorPoolSize& poolSize,
+			uint32_t maxSets)
+		{
+			VkDescriptorPoolCreateInfo descriptorPoolInfo{};
+			descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			descriptorPoolInfo.poolSizeCount = 1;
+			descriptorPoolInfo.pPoolSizes = &poolSize;
+			descriptorPoolInfo.maxSets = maxSets;
+			return descriptorPoolInfo;
+		}
+
 		inline VkDescriptorPoolSize descriptorPoolSize(
 			VkDescriptorType type,
 			uint32_t descriptorCount)
@@ -278,6 +330,16 @@ namespace vks
 			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			descriptorSetLayoutCreateInfo.pBindings = bindings.data();
 			descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+			return descriptorSetLayoutCreateInfo;
+		}
+
+		inline VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo(
+			const VkDescriptorSetLayoutBinding& binding)
+		{
+			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptorSetLayoutCreateInfo.pBindings = &binding;
+			descriptorSetLayoutCreateInfo.bindingCount = 1;
 			return descriptorSetLayoutCreateInfo;
 		}
 
@@ -414,6 +476,13 @@ namespace vks
 			pipelineInputAssemblyStateCreateInfo.topology = topology;
 			pipelineInputAssemblyStateCreateInfo.flags = flags;
 			pipelineInputAssemblyStateCreateInfo.primitiveRestartEnable = primitiveRestartEnable;
+			return pipelineInputAssemblyStateCreateInfo;
+		}
+
+		inline VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo()
+		{
+			VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{};
+			pipelineInputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 			return pipelineInputAssemblyStateCreateInfo;
 		}
 

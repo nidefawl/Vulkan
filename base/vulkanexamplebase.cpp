@@ -1,7 +1,7 @@
 /*
 * Vulkan Example base class
 *
-* Copyright (C) by Sascha Willems - www.saschawillems.de
+* Copyright (C) 2016-2021 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
 */
@@ -228,7 +228,10 @@ void VulkanExampleBase::nextFrame()
 		viewChanged();
 	}
 
-	render();
+	if (prepared) {
+		render();
+	}
+	resized = false;
 	frameCounter++;
 	auto tEnd = std::chrono::high_resolution_clock::now();
 	auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -414,7 +417,9 @@ void VulkanExampleBase::renderLoop()
 			viewUpdated = false;
 			viewChanged();
 		}
-		render();
+		if (prepared) {
+			render();
+		}
 		frameCounter++;
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -456,7 +461,9 @@ void VulkanExampleBase::renderLoop()
 		{
 			handleEvent(&event);
 		}
-		render();
+		if (prepared) {
+			render();
+		}
 		frameCounter++;
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -502,7 +509,9 @@ void VulkanExampleBase::renderLoop()
 		wl_display_read_events(display);
 		wl_display_dispatch_pending(display);
 
-		render();
+		if (prepared) {
+			render();
+		}
 		frameCounter++;
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -551,7 +560,9 @@ void VulkanExampleBase::renderLoop()
 			handleEvent(event);
 			free(event);
 		}
-		render();
+		if (prepared) {
+			render();
+		}
 		frameCounter++;
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -717,6 +728,121 @@ void VulkanExampleBase::submitFrame()
 		}
 	}
 	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
+}
+
+void VulkanExampleBase::prepareFrame(VulkanFrameObjects& frame)
+{
+	// Ensure command buffer execution has finished
+	VK_CHECK_RESULT(vkWaitForFences(device, 1, &frame.renderCompleteFence, VK_TRUE, UINT64_MAX));
+	VK_CHECK_RESULT(vkResetFences(device, 1, &frame.renderCompleteFence));
+	// Acquire the next image from the swap chain
+	VkResult result = swapChain.acquireNextImage(frame.presentCompleteSemaphore, &currentBuffer);
+	// @todo: rework after removing currentBuffer
+	swapChain.currentImageIndex = currentBuffer;
+	// Recreate the swapchain if it's no longer compatible with the surface (OUT_OF_DATE) or no longer optimal for presentation (SUBOPTIMAL)
+	if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
+		windowResize();
+	} else {
+		VK_CHECK_RESULT(result);
+	}
+}
+
+void VulkanExampleBase::submitFrame(VulkanFrameObjects& frame)
+{
+	// Submit command buffer to queue
+	VkPipelineStageFlags submitWaitStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	submitInfo = vks::initializers::submitInfo();
+	submitInfo.pWaitDstStageMask = &submitWaitStages;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &frame.presentCompleteSemaphore;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &frame.renderCompleteSemaphore;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &frame.commandBuffer;
+	VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, frame.renderCompleteFence));
+
+	// Present image to queue
+	VkResult result = swapChain.queuePresent(queue, currentBuffer, frame.renderCompleteSemaphore);
+	if (!((result == VK_SUCCESS) || (result == VK_SUBOPTIMAL_KHR))) {
+		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+			// Swap chain is no longer compatible with the surface and needs to be recreated
+			windowResize();
+			return;
+		}
+		else {
+			VK_CHECK_RESULT(result);
+		}
+	}
+
+	frameIndex++;
+	if (frameIndex >= renderAhead) {
+		frameIndex = 0;
+	}
+}
+
+uint32_t VulkanExampleBase::getFrameCount()
+{
+	return renderAhead;
+}
+
+uint32_t VulkanExampleBase::getCurrentFrameIndex()
+{
+	return frameIndex;
+}
+
+const VkRect2D VulkanExampleBase::getRenderArea()
+{
+	VkRect2D renderArea = {};
+	renderArea.extent = { width, height };
+	return renderArea;
+}
+
+const VkViewport VulkanExampleBase::getViewport()
+{
+	VkViewport viewport = {};
+	viewport.width = (float)width;
+	viewport.height = (float)height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	return viewport;
+}
+
+const VkCommandBufferBeginInfo VulkanExampleBase::getCommandBufferBeginInfo(VkCommandBufferUsageFlags flags)
+{
+	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	commandBufferBeginInfo.flags = flags;
+	return commandBufferBeginInfo;
+}
+
+const VkRenderPassBeginInfo VulkanExampleBase::getRenderPassBeginInfo(VkRenderPass renderPass, VkClearValue* clearValues, uint32_t clearValueCount)
+{
+	VkRenderPassBeginInfo renderPassBeginInfo = {};
+	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassBeginInfo.renderPass = renderPass;
+	renderPassBeginInfo.framebuffer = frameBuffers[currentBuffer];
+	renderPassBeginInfo.renderArea.extent = { width, height };
+	renderPassBeginInfo.clearValueCount = clearValueCount;
+	renderPassBeginInfo.pClearValues = clearValues;
+	return renderPassBeginInfo;
+}
+
+void VulkanExampleBase::createBaseFrameObjects(VulkanFrameObjects& frame)
+{
+	VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &frame.commandBuffer));
+	VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+	VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, nullptr, &frame.renderCompleteFence));
+	VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
+	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.presentCompleteSemaphore));
+	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.renderCompleteSemaphore));
+}
+
+void VulkanExampleBase::destroyBaseFrameObjects(VulkanFrameObjects& frame)
+{
+	vkDestroyFence(device, frame.renderCompleteFence, nullptr);
+	vkDestroySemaphore(device, frame.presentCompleteSemaphore, nullptr);
+	vkDestroySemaphore(device, frame.renderCompleteSemaphore, nullptr);
 }
 
 VulkanExampleBase::VulkanExampleBase(bool enableValidation)
@@ -2620,9 +2746,9 @@ void VulkanExampleBase::setupRenderPass()
 	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependencies[0].dstSubpass = 0;
 	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 	dependencies[1].srcSubpass = 0;

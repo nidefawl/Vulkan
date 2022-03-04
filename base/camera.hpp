@@ -106,6 +106,16 @@ public:
 		}
 	}
 
+	void setType(Camera::CameraType type)
+	{
+		this->type = type;
+	}
+
+	void setFlipY(bool flipY)
+	{
+		this->flipY = flipY;
+	}
+
 	void setPosition(glm::vec3 position)
 	{
 		this->position = position;

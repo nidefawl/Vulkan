@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
-cmake_policy(VERSION 2.8)
+cmake_minimum_required(VERSION 3.4)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 set(NAME vulkanExamples)
@@ -109,15 +108,6 @@ endif()
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-file(GLOB SOURCE *.cpp )
-
-# Build all examples
-function(buildExamples)
-	foreach(EXAMPLE ${EXAMPLES})
-		buildExample(${EXAMPLE})
-	endforeach(EXAMPLE)
-endfunction(buildExamples)
 
 if(RESOURCE_INSTALL_DIR)
 	add_definitions(-DVK_EXAMPLE_DATA_DIR=\"${RESOURCE_INSTALL_DIR}/\")

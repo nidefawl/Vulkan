@@ -1,7 +1,7 @@
 /*
 * Vulkan Example base class
 *
-* Copyright (C) by Sascha Willems - www.saschawillems.de
+* Copyright (C) 2016-2021 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
 */
@@ -92,6 +92,14 @@ public:
 	int32_t getValueAsInt(std::string name, int32_t defaultValue);
 };
 
+struct VulkanFrameObjects
+{
+	VkCommandBuffer commandBuffer;
+	VkFence renderCompleteFence;
+	VkSemaphore renderCompleteSemaphore;
+	VkSemaphore presentCompleteSemaphore;
+};
+
 class VulkanExampleBase
 {
 private:
@@ -174,6 +182,10 @@ protected:
 		VkSemaphore renderComplete;
 	} semaphores;
 	std::vector<VkFence> waitFences;
+
+	// @todo
+	uint32_t frameIndex = 0;
+	uint32_t renderAhead = 2;
 public:
 	bool prepared = false;
 	bool resized = false;
@@ -202,7 +214,8 @@ public:
 		/** @brief Enable UI overlay */
 		bool overlay = true;
 	} settings;
-
+	
+	VkClearValue defaultClearValues[2] = { { 0.0f, 0.0f, 0.2f, 1.0f }, { 1.0f, 0 } };
 	VkClearColorValue defaultClearColor = { { 0.025f, 0.025f, 0.025f, 1.0f } };
 
 	static std::vector<const char*> args;
@@ -400,11 +413,26 @@ public:
 	void prepareFrame();
 	/** @brief Presents the current image to the swap chain */
 	void submitFrame();
+
 	/** @brief (Virtual) Default image acquire + submission and command buffer submission function */
 	virtual void renderFrame();
 
 	/** @brief (Virtual) Called when the UI overlay is updating, can be used to add custom elements to the overlay */
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay);
+
+	// @todo: Functions for reworked proper sync and per-frame resources
+	void prepareFrame(VulkanFrameObjects& frame);
+	void submitFrame(VulkanFrameObjects& frame);
+	uint32_t getFrameCount();
+	uint32_t getCurrentFrameIndex();
+
+	void createBaseFrameObjects(VulkanFrameObjects& frame);
+	void destroyBaseFrameObjects(VulkanFrameObjects& frame);
+
+	const VkRect2D getRenderArea();
+	const VkViewport getViewport();
+	const VkRenderPassBeginInfo getRenderPassBeginInfo(VkRenderPass renderPass, VkClearValue * clearValues, uint32_t clearValueCount = 2);
+	const VkCommandBufferBeginInfo getCommandBufferBeginInfo(VkCommandBufferUsageFlags flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 };
 
 // OS specific macros for the example main entry points
